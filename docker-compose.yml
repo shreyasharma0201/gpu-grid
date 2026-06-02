@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:15.3
+    container_name: gpugrid-postgres
+
+    environment:
+      POSTGRES_DB: gpugrid
+      POSTGRES_USER: gpugrid
+      POSTGRES_PASSWORD: shreya
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
