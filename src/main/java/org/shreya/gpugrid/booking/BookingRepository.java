@@ -199,4 +199,9 @@ public class BookingRepository {
         Integer count = jdbc.queryForObject(sql, Integer.class, args);
         return count != null && count > 0;
     }
+
+    public void deleteAll() {
+        jdbc.update("DELETE FROM bookings");
+    }
+
 }
