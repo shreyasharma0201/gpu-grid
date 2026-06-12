@@ -7,6 +7,7 @@ import org.shreya.gpugrid.executor.GpuExecutor;
 import org.shreya.gpugrid.executor.JobExecutionStatus;
 import org.shreya.gpugrid.inventory.GpuRepository;
 import org.shreya.gpugrid.inventory.GpuStatus;
+import org.shreya.gpugrid.reporting.UtilizationTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -19,21 +20,28 @@ public class JobLifecycleManager {
 
     private static final Logger log = LoggerFactory.getLogger(JobLifecycleManager.class);
 
-    private final JobRepository jobRepository;
-    private final BookingRepository bookingRepository;
-    private final GpuRepository gpuRepository;
-    private final GpuExecutor gpuExecutor;
+    private final JobRepository       jobRepository;
+    private final BookingRepository   bookingRepository;
+    private final GpuRepository       gpuRepository;
+    private final GpuExecutor         gpuExecutor;
+    private final UtilizationTracker  utilizationTracker;
 
     public JobLifecycleManager(JobRepository jobRepository,
-                                BookingRepository bookingRepository,
-                                GpuRepository gpuRepository,
-                                GpuExecutor gpuExecutor) {
-        this.jobRepository     = jobRepository;
-        this.bookingRepository = bookingRepository;
-        this.gpuRepository     = gpuRepository;
-        this.gpuExecutor       = gpuExecutor;
+                               BookingRepository bookingRepository,
+                               GpuRepository gpuRepository,
+                               GpuExecutor gpuExecutor,
+                               UtilizationTracker utilizationTracker) {
+        this.jobRepository      = jobRepository;
+        this.bookingRepository  = bookingRepository;
+        this.gpuRepository      = gpuRepository;
+        this.gpuExecutor        = gpuExecutor;
+        this.utilizationTracker = utilizationTracker;
     }
 
+    /**
+     * Launch a job for a RESERVED booking.
+     * Flow: create Job (PENDING) → startJob() → Job (RUNNING) → Booking (RUNNING) → GPU (RUNNING)
+     */
     @Transactional
     public Job launch(Booking booking) {
         log.info("Launching job for booking id={} gpu={} user={}", booking.id(), booking.gpuId(), booking.userId());
@@ -51,36 +59,35 @@ public class JobLifecycleManager {
             throw e;
         }
 
-        // 3. Update job
+        // 3. Job → RUNNING
         Job runningJob = new Job(
-                job.id(),
-                job.bookingId(),
-                executionId,
-                JobStatus.RUNNING,
-                LocalDateTime.now(),
-                null,
-                null
+                job.id(), job.bookingId(), executionId,
+                JobStatus.RUNNING, LocalDateTime.now(), null, null
         );
-        Job savedJob = jobRepository.save(runningJob);
+        jobRepository.save(runningJob);
 
-
-
-        // 4. Update booking → RUNNING
+        // 4. Booking → RUNNING
         bookingRepository.updateStatus(booking.id(), BookingStatus.RUNNING);
 
-        // 5. Update GPU status → RUNNING
+        // 5. GPU → RUNNING
         gpuRepository.updateStatus(booking.gpuId(), GpuStatus.RUNNING);
 
+        // 6. Log utilization — ACTIVE
+        utilizationTracker.logActive(booking.gpuId(), job.id());
+
         log.info("Job id={} RUNNING on GPU {} (executionId={})", job.id(), booking.gpuId(), executionId);
-        return savedJob;
+        return jobRepository.findById(job.id()).orElseThrow();
     }
 
+    /**
+     * Poll a running job — update state if it has finished.
+     */
     @Transactional
     public void poll(Job job) {
         JobExecutionStatus execStatus = gpuExecutor.getStatus(job.containerId());
 
         switch (execStatus) {
-            case RUNNING -> { /* nothing to do */ }
+            case RUNNING -> { /* still going */ }
 
             case COMPLETED -> {
                 log.info("Job id={} COMPLETED", job.id());
@@ -88,7 +95,7 @@ public class JobLifecycleManager {
             }
 
             case FAILED -> {
-                log.warn("Job id={} FAILED (reported by executor)", job.id());
+                log.warn("Job id={} FAILED (executor reported)", job.id());
                 Booking booking = bookingRepository.findById(job.bookingId())
                         .orElseThrow(() -> new IllegalStateException("Booking not found for job " + job.id()));
                 fail(job, booking, "Executor reported FAILED");
@@ -99,20 +106,18 @@ public class JobLifecycleManager {
     // --- private helpers ---
 
     private void complete(Job job) {
-        // Update job → COMPLETED
         Job completed = new Job(
                 job.id(), job.bookingId(), job.containerId(),
                 JobStatus.COMPLETED, job.startedAt(), LocalDateTime.now(), null
         );
         jobRepository.save(completed);
-
-        // Update booking → COMPLETED
         bookingRepository.updateStatus(job.bookingId(), BookingStatus.COMPLETED);
 
-        // Release GPU → AVAILABLE
-        bookingRepository.findById(job.bookingId()).ifPresent(booking ->
-                gpuRepository.updateStatus(booking.gpuId(), GpuStatus.AVAILABLE)
-        );
+        bookingRepository.findById(job.bookingId()).ifPresent(booking -> {
+            gpuRepository.updateStatus(booking.gpuId(), GpuStatus.AVAILABLE);
+            // Log utilization — IDLE (GPU now free)
+            utilizationTracker.logIdle(booking.gpuId(), job.id());
+        });
     }
 
     private void fail(Job job, Booking booking, String reason) {
@@ -123,5 +128,6 @@ public class JobLifecycleManager {
         jobRepository.save(failed);
         bookingRepository.updateStatus(booking.id(), BookingStatus.FAILED);
         gpuRepository.updateStatus(booking.gpuId(), GpuStatus.AVAILABLE);
+        utilizationTracker.logIdle(booking.gpuId(), job.id());
     }
 }
