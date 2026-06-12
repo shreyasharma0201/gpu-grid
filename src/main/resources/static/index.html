@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPUGrid Dashboard</title>
+    <style>
+        :root {
+            --bg:       #0d1117;
+            --surface:  #161b22;
+            --border:   #30363d;
+            --text:     #e6edf3;
+            --muted:    #8b949e;
+            --green:    #3fb950;
+            --yellow:   #d29922;
+            --red:      #f85149;
+            --blue:     #58a6ff;
+            --purple:   #bc8cff;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 14px;
+            min-height: 100vh;
+        }
+
+        header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        header h1 { font-size: 18px; font-weight: 600; letter-spacing: .3px; }
+        header .badge {
+            background: var(--blue);
+            color: #000;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 20px;
+            text-transform: uppercase;
+        }
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 6px var(--green);
+            animation: pulse 2s infinite;
+            margin-left: auto;
+        }
+        .status-dot.offline { background: var(--red); box-shadow: 0 0 6px var(--red); animation: none; }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+
+        .refresh-label {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        main {
+            padding: 24px;
+            display: grid;
+            gap: 24px;
+        }
+
+        /* ── Section ── */
+        .section-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 12px;
+        }
+
+        /* ── GPU cards ── */
+        .gpu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 12px;
+        }
+        .gpu-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            transition: border-color .2s;
+        }
+        .gpu-card:hover { border-color: var(--blue); }
+        .gpu-card .gpu-name { font-weight: 600; margin-bottom: 4px; }
+        .gpu-card .gpu-type { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+        .gpu-card .gpu-status {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-AVAILABLE { background: rgba(63,185,80,.15); color: var(--green); border: 1px solid rgba(63,185,80,.3); }
+        .status-RUNNING   { background: rgba(88,166,255,.15); color: var(--blue);  border: 1px solid rgba(88,166,255,.3); }
+        .status-RESERVED  { background: rgba(210,153,34,.15); color: var(--yellow);border: 1px solid rgba(210,153,34,.3); }
+        .status-OFFLINE   { background: rgba(248,81,73,.15);  color: var(--red);   border: 1px solid rgba(248,81,73,.3);  }
+
+        /* ── Cost savings panel ── */
+        .savings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+        }
+        .metric-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .metric-card .metric-label {
+            color: var(--muted);
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        .metric-card .metric-value {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .metric-card .metric-sub {
+            color: var(--muted);
+            font-size: 11px;
+            margin-top: 4px;
+        }
+        .metric-card.highlight { border-color: var(--green); }
+        .metric-card.highlight .metric-value { color: var(--green); }
+
+        /* ── Utilization table ── */
+        .table-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            background: var(--bg);
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .8px;
+            text-transform: uppercase;
+            padding: 10px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        td {
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(255,255,255,.02); }
+
+        .pct-bar-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .pct-bar {
+            flex: 1;
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .pct-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: var(--blue);
+            transition: width .4s ease;
+        }
+        .pct-label { width: 42px; text-align: right; font-size: 12px; color: var(--muted); }
+
+        /* ── Per-GPU savings table ── */
+        .per-gpu-title {
+            font-size: 12px;
+            color: var(--muted);
+            margin: 16px 0 8px;
+            font-weight: 600;
+        }
+
+        /* ── Error / empty ── */
+        .empty { color: var(--muted); font-size: 13px; padding: 16px; }
+
+        /* ── Time range picker ── */
+        .controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .controls label { color: var(--muted); font-size: 12px; }
+        .controls input[type=number] {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            padding: 6px 10px;
+            width: 70px;
+            font-size: 13px;
+        }
+        .btn {
+            background: var(--blue);
+            color: #000;
+            border: none;
+            border-radius: 6px;
+            padding: 7px 16px;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            transition: opacity .15s;
+        }
+        .btn:hover { opacity: .85; }
+
+        footer {
+            color: var(--muted);
+            font-size: 11px;
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <span style="font-size:20px">⬡</span>
+    <h1>GPUGrid</h1>
+    <span class="badge">Live</span>
+    <span class="refresh-label" id="lastUpdated">—</span>
+    <span class="status-dot" id="statusDot"></span>
+</header>
+
+<main>
+
+    <!-- GPU state cards -->
+    <section>
+        <div class="section-title">GPU Inventory</div>
+        <div class="gpu-grid" id="gpuGrid">
+            <div class="empty">Loading…</div>
+        </div>
+    </section>
+
+    <!-- Cost savings -->
+    <section>
+        <div class="section-title">Cost Savings</div>
+        <div class="controls">
+            <label>Look-back hours</label>
+            <input type="number" id="lookbackHours" value="24" min="1" max="8760">
+            <button class="btn" onclick="fetchCostSavings()">Refresh</button>
+        </div>
+        <br>
+        <div class="savings-grid" id="savingsGrid">
+            <div class="empty">Loading…</div>
+        </div>
+        <div class="per-gpu-title" id="perGpuTitle" style="display:none">Per-GPU breakdown</div>
+        <div class="table-wrap" id="perGpuTable" style="display:none">
+            <table>
+                <thead>
+                <tr>
+                    <th>GPU</th>
+                    <th>Active h</th>
+                    <th>Idle h</th>
+                    <th>Idle cost</th>
+                    <th>Savings</th>
+                </tr>
+                </thead>
+                <tbody id="perGpuBody"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Utilization -->
+    <section>
+        <div class="section-title">Utilization (same window)</div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>GPU</th>
+                    <th>Active min</th>
+                    <th>Utilization</th>
+                </tr>
+                </thead>
+                <tbody id="utilBody">
+                <tr><td colspan="3" class="empty">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+</main>
+
+<footer id="footer">Auto-refreshes every 5 s &nbsp;·&nbsp; GPUGrid</footer>
+
+<script>
+    const POLL_INTERVAL_MS = 5000;
+
+    // ── helpers ──────────────────────────────────────────────────────────────────
+
+    function fmt(v, decimals = 2) {
+        if (v === null || v === undefined) return '—';
+        return Number(v).toFixed(decimals);
+    }
+
+    function usd(v) {
+        if (v === null || v === undefined) return '—';
+        return '$' + Number(v).toFixed(2);
+    }
+
+    function nowIso() { return new Date().toISOString().slice(0, 19); }
+
+    function hoursAgoIso(h) {
+        const d = new Date(Date.now() - h * 3600 * 1000);
+        return d.toISOString().slice(0, 19);
+    }
+
+    function setStatusOnline(ok) {
+        const dot = document.getElementById('statusDot');
+        dot.className = 'status-dot' + (ok ? '' : ' offline');
+    }
+
+    function updateTimestamp() {
+        document.getElementById('lastUpdated').textContent =
+            'Updated ' + new Date().toLocaleTimeString();
+    }
+
+    // ── GPU inventory ─────────────────────────────────────────────────────────────
+
+    async function fetchGpus() {
+        try {
+            const res = await fetch('/api/gpus');
+            if (!res.ok) throw new Error(res.status);
+            const gpus = await res.json();
+            renderGpus(gpus);
+            setStatusOnline(true);
+        } catch (e) {
+            document.getElementById('gpuGrid').innerHTML =
+                `<div class="empty">⚠ Failed to load GPUs: ${e.message}</div>`;
+            setStatusOnline(false);
+        }
+    }
+
+    function renderGpus(gpus) {
+        const grid = document.getElementById('gpuGrid');
+        if (!gpus.length) {
+            grid.innerHTML = '<div class="empty">No GPUs registered.</div>';
+            return;
+        }
+        grid.innerHTML = gpus.map(g => `
+    <div class="gpu-card">
+      <div class="gpu-name">GPU #${g.id} &nbsp; ${escHtml(g.name)}</div>
+      <div class="gpu-type">${escHtml(g.type || 'Unknown type')}</div>
+      <span class="gpu-status status-${g.status}">${g.status}</span>
+    </div>
+  `).join('');
+    }
+
+    // ── Cost savings ──────────────────────────────────────────────────────────────
+
+    async function fetchCostSavings() {
+        const hours  = parseInt(document.getElementById('lookbackHours').value) || 24;
+        const from   = hoursAgoIso(hours);
+        const to     = nowIso();
+        const url    = `/api/reports/cost-savings?from=${from}&to=${to}`;
+
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(res.status);
+            const data = await res.json();
+            renderSavings(data);
+            fetchUtilization(from, to);   // keep the same window in sync
+        } catch (e) {
+            document.getElementById('savingsGrid').innerHTML =
+                `<div class="empty">⚠ Failed to load cost savings: ${e.message}</div>`;
+        }
+    }
+
+    function renderSavings(d) {
+        const metrics = [
+            { label: 'Active GPU-hours',  value: fmt(d.totalActiveHours), sub: 'time GPUs spent working' },
+            { label: 'Idle GPU-hours',    value: fmt(d.totalIdleHours),   sub: 'time GPUs sat idle' },
+            { label: 'Idle cost',         value: usd(d.idleCostUsd),      sub: `@ $${d.hourlyRateUsd}/h` },
+            { label: 'Active cost',       value: usd(d.activeCostUsd),    sub: 'spend on real work' },
+            { label: 'Estimated savings', value: usd(d.estimatedSavingsUsd), sub: 'vs full-idle baseline', highlight: true },
+            { label: 'Hourly rate',       value: `$${fmt(d.hourlyRateUsd)}/h`, sub: 'configured rate' },
+        ];
+
+        document.getElementById('savingsGrid').innerHTML = metrics.map(m => `
+    <div class="metric-card ${m.highlight ? 'highlight' : ''}">
+      <div class="metric-label">${m.label}</div>
+      <div class="metric-value">${m.value}</div>
+      <div class="metric-sub">${m.sub}</div>
+    </div>
+  `).join('');
+
+        // Per-GPU breakdown
+        const rows = d.perGpu || [];
+        if (rows.length) {
+            document.getElementById('perGpuTitle').style.display = '';
+            document.getElementById('perGpuTable').style.display = '';
+            document.getElementById('perGpuBody').innerHTML = rows.map(r => `
+      <tr>
+        <td><strong>#${r.gpuId}</strong> ${escHtml(r.gpuName)}</td>
+        <td>${fmt(r.activeHours)} h</td>
+        <td>${fmt(r.idleHours)} h</td>
+        <td>${usd(r.idleCostUsd)}</td>
+        <td style="color:var(--green)">${usd(r.savingsUsd)}</td>
+      </tr>
+    `).join('');
+        }
+    }
+
+    // ── Utilization ───────────────────────────────────────────────────────────────
+
+    async function fetchUtilization(from, to) {
+        if (!from || !to) {
+            const hours = parseInt(document.getElementById('lookbackHours').value) || 24;
+            from = hoursAgoIso(hours);
+            to   = nowIso();
+        }
+        const url = `/api/reports/utilization?from=${from}&to=${to}`;
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(res.status);
+            const rows = await res.json();
+            renderUtilization(rows);
+        } catch (e) {
+            document.getElementById('utilBody').innerHTML =
+                `<tr><td colspan="3" class="empty">⚠ ${e.message}</td></tr>`;
+        }
+    }
+
+    function renderUtilization(rows) {
+        if (!rows.length) {
+            document.getElementById('utilBody').innerHTML =
+                '<tr><td colspan="3" class="empty">No data for this window.</td></tr>';
+            return;
+        }
+        document.getElementById('utilBody').innerHTML = rows.map(r => {
+            const pct = parseFloat(r.utilization_pct) || 0;
+            const barColor = pct > 70 ? 'var(--green)' : pct > 30 ? 'var(--yellow)' : 'var(--red)';
+            return `
+      <tr>
+        <td><strong>#${r.gpu_id}</strong> ${escHtml(r.gpu_name)}</td>
+        <td>${r.active_minutes ?? 0} min</td>
+        <td>
+          <div class="pct-bar-wrap">
+            <div class="pct-bar">
+              <div class="pct-bar-fill" style="width:${Math.min(pct,100)}%;background:${barColor}"></div>
+            </div>
+            <span class="pct-label">${fmt(pct, 1)}%</span>
+          </div>
+        </td>
+      </tr>
+    `;
+        }).join('');
+    }
+
+    // ── XSS guard ─────────────────────────────────────────────────────────────────
+
+    function escHtml(s) {
+        return String(s ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    // ── Poll loop ─────────────────────────────────────────────────────────────────
+
+    async function pollAll() {
+        await fetchGpus();
+        await fetchCostSavings();  // also triggers fetchUtilization internally
+        updateTimestamp();
+    }
+
+    pollAll();
+    setInterval(pollAll, POLL_INTERVAL_MS);
+</script>
+</body>
+</html>
