@@ -47,6 +47,18 @@ public interface GpuExecutor {
 
 <img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/5f8723ed-7ed2-43ca-b46a-64622a1abcbf" />
 
+## Live Dashboard
+
+<img width="1891" height="952" alt="image" src="https://github.com/user-attachments/assets/930759e5-6dc4-40a7-a446-c52683edccd2" />
+
+Real-time monitoring dashboard showing:
+
+- GPU inventory and status
+- Utilization metrics
+- Cost savings analytics
+- Per-GPU breakdown
+- Scheduler activity
+
 ## Module structure
 
 ```
