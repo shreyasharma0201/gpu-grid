@@ -31,3 +31,20 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### macOS
+.DS_Store
+
+### Windows
+Thumbs.db
+
+### Spring Boot
+*.log
+logs/
+
+### Environment
+.env
+*.env
+
+### secrets
+application-prod.properties

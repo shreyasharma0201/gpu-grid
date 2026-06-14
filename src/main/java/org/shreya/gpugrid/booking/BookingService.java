@@ -108,8 +108,8 @@ public class BookingService {
         if (!endTime.isAfter(startTime)) {
             throw new IllegalArgumentException("endTime must be after startTime");
         }
-        if (startTime.isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("startTime must be in the future");
+        if (startTime.isBefore(LocalDateTime.now().minusHours(1))) {
+            throw new IllegalArgumentException("startTime cannot be more than 1 hour in the past");
         }
     }
 }

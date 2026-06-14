@@ -1,18 +1,22 @@
+version: '3.8'
+
 services:
   postgres:
-    image: postgres:15.3
+    image: postgres:15
     container_name: gpugrid-postgres
-
     environment:
       POSTGRES_DB: gpugrid
       POSTGRES_USER: gpugrid
       POSTGRES_PASSWORD: shreya
-
     ports:
       - "5432:5432"
-
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - gpugrid_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gpugrid"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  postgres_data:
+  gpugrid_data:
