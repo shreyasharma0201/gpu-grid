@@ -108,8 +108,9 @@ public class BookingService {
         if (!endTime.isAfter(startTime)) {
             throw new IllegalArgumentException("endTime must be after startTime");
         }
-        if (startTime.isBefore(LocalDateTime.now().minusHours(1))) {
-            throw new IllegalArgumentException("startTime cannot be more than 1 hour in the past");
+        // NEW - only blocks very old dates, allows past bookings for demo/scheduling
+        if (startTime.isBefore(LocalDateTime.now().minusDays(30))) {
+            throw new IllegalArgumentException("startTime cannot be more than 30 days in the past");
         }
     }
 }

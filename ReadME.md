@@ -113,8 +113,7 @@ cd gpugrid
 docker compose up -d postgres
 
 # 3. Run (Windows PowerShell)
-$env:SPRING_PROFILES_ACTIVE="dev"
-./mvnw spring-boot:run
+.\mvnw.cmd spring-boot:run
 
 # 3. Run (Linux/macOS)
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev

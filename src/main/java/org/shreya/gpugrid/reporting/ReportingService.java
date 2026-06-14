@@ -155,6 +155,7 @@ public class ReportingService {
 
         // Savings = value delivered by keeping GPUs active vs full-idle baseline
         double estimatedSavingsUsd = potentialCostUsd - totalIdleCostUsd;
+//        double estimatedSavingsUsd = totalIdleCostUsd;
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("from",                  from.toString());
