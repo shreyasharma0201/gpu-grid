@@ -45,26 +45,7 @@ public interface GpuExecutor {
 
 ## Architecture
 
-```
-Users / Clients
-      │  REST API (Spring Boot)
-      ▼
-┌─────────────────────────────────────────────┐
-│                  GPUGrid                    │
-│                                             │
-│  BookingService      SchedulerService       │
-│  ConflictDetector    JobLifecycleManager    │
-│  UtilizationTracker  ReportingService       │
-│                                             │
-│     BookingRepository (PostgreSQL/JDBC)     │
-└────────────────────┬────────────────────────┘
-                     │
-              GpuExecutor (interface)
-               /                \
-    MockGpuExecutor         DockerGpuExecutor
-    (@Profile dev)          (@Profile prod)
-    Thread.sleep()          docker run --gpus
-```
+<img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/5f8723ed-7ed2-43ca-b46a-64622a1abcbf" />
 
 ## Module structure
 
