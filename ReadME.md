@@ -227,13 +227,3 @@ gpugrid.scheduler.strategy=PRIORITY  # higher priority number dispatched first
 | GET | `/api/reports/queue-depth` | Pending bookings per GPU |
 
 ---
-
-## Project phases
-
-| Phase | Description | Status |
-|---|---|---|
-| 1 | GPU inventory + booking API + conflict detection | ✅ |
-| 2 | Scheduler + job lifecycle + MockGpuExecutor | ✅ |
-| 3 | Concurrency tests + utilization reporting | ✅ |
-| 4 | DockerGpuExecutor (prod profile) | ✅ |
-| 5 | Dashboard + cost savings + priority scheduler | ✅ |
